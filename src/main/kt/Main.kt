@@ -1,6 +1,7 @@
 import com.google.common.io.Files
 import org.openqa.selenium.By
 import org.openqa.selenium.Keys
+import org.openqa.selenium.NoSuchElementException
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.WebElement
 import org.openqa.selenium.chrome.ChromeDriver
@@ -20,15 +21,18 @@ import javax.imageio.ImageIO
 
 object Main {
     val MAIN_URL = "https://author.today/"
-    val STORY_URL = "https://author.today/reader/45969"
+    val STORY_URL = "https://author.today/reader/45969/361004"
     val logger = Logger.getLogger("Main")
+
+
+    val next =     "#reader > div.reader-content.hidden-print > div > ul > li.next > a"
+
     @JvmStatic
     fun main(args: Array<String>) {
         main()
     }
 
     fun setAttribute(driver: RemoteWebDriver, element: WebElement?, attName: String?, attValue: String?) {
-
         driver.executeScript(
             "arguments[0].setAttribute(arguments[1], arguments[2]);",
             element, attName, attValue
@@ -67,6 +71,23 @@ object Main {
         driver.findElement(By.ByXPath("/html/body/div[3]/div/div/div[2]/div/div/div/form/button")).click()
 
         driver.get(STORY_URL)
+        while (true) {
+            extractChapter(driver)
+            try {
+                val element = driver.findElement(By.ByCssSelector(next))
+                element.click()
+                Thread.sleep(100)
+                waitFor(wait, "/html/body/div[1]/section/div[2]/div")
+            } catch (e: NoSuchElementException) {
+                break
+            }
+        }
+
+
+        driver.close()
+    }
+
+    private fun extractChapter(driver: WebDriver) {
         val elements = driver.findElements(By.cssSelector("div.text-container > *"))
         var text = ""
         for (element in elements) {
@@ -89,13 +110,11 @@ object Main {
 
             var innerHTML = element.getAttribute("innerHTML")
 
-            text = text + innerHTML
+            text = text + "<div>" + innerHTML + "</div>"
         }
 
         val result = File("./" + driver.title + ".html")
         BufferedWriter(FileWriter(result)).write(text)
-
-        driver.close()
     }
 
     private fun waitFor(wait: WebDriverWait, xpath: String) {
