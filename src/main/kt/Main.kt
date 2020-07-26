@@ -108,7 +108,6 @@ object Main {
         val title = driver.findElement(By.cssSelector(TITLE_CSS_SELECTOR)).getAttribute("innerText")
         val elements = driver.findElements(By.cssSelector("div.text-container > *"))
         var text = "<!-- ${driver.currentUrl} -->\n"
-        text += "<h1>$title</h1>\n"
         for (element in elements) {
             val images = element.findElements(By.cssSelector("img"))
             for (img in images) {
@@ -124,8 +123,8 @@ object Main {
                 setAttribute(driver as RemoteWebDriver, img, "src", outFile.path)
             }
 
-            var innerHTML = element.getAttribute("innerHTML")
-            text = "$text<div>$innerHTML</div>\n"
+            var outerHTML = element.getAttribute("outerHTML")
+            text += "$outerHTML\n"
         }
 
         val result = File("./$title.html")
@@ -142,5 +141,4 @@ object Main {
     private fun waitForCss(wait: WebDriverWait, cssSelector: String) {
         wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(cssSelector)))
     }
-
 }
