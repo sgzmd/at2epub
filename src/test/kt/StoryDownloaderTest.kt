@@ -1,5 +1,4 @@
-import jdk.nashorn.internal.ir.annotations.Ignore
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.io.FileInputStream
 import java.util.*
