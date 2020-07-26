@@ -3,7 +3,6 @@ import org.openqa.selenium.*
 import org.openqa.selenium.NoSuchElementException
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.chrome.ChromeOptions
-import org.openqa.selenium.interactions.Actions
 import org.openqa.selenium.remote.RemoteWebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
@@ -21,8 +20,6 @@ object Main {
     val MAIN_URL = "https://author.today/"
     val STORY_URL = "https://author.today/reader/45969/361004"
     val logger = Logger.getLogger("Main")
-
-    val TITLE_CSS_SELECTOR = "#text-container > h1"
 
 
     val next =     "#reader > div.reader-content.hidden-print > div > ul > li.next > a"
@@ -134,11 +131,4 @@ object Main {
         bufferedWriter.close()
     }
 
-    private fun waitFor(wait: WebDriverWait, xpath: String) {
-        wait.until(ExpectedConditions.elementToBeClickable(By.ByXPath(xpath)))
-    }
-
-    private fun waitForCss(wait: WebDriverWait, cssSelector: String) {
-        wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(cssSelector)))
-    }
 }
