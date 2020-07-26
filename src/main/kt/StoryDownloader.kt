@@ -1,4 +1,5 @@
 import com.google.common.annotations.VisibleForTesting
+import com.google.common.io.Files
 import org.openqa.selenium.By
 import org.openqa.selenium.Keys
 import org.openqa.selenium.WebElement
@@ -7,6 +8,8 @@ import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.remote.RemoteWebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
+import java.io.File
+import java.lang.Exception
 import java.net.URL
 import java.util.*
 import java.util.logging.Logger
@@ -80,16 +83,44 @@ class StoryDownloader(props: Properties) {
         while (true) {
             chapters.add(getNextChapter())
             try {
-                val element = driver.findElement(By.ByCssSelector(NEXT_CSS_SELECTOR))
+                val elements = driver.findElementsByCssSelector(NEXT_CSS_SELECTOR)
+                if (elements.isEmpty()) {
+                    break
+                }
+                val element = elements[0]
                 driver.executeScript("arguments[0].scrollIntoView(true);", element)
                 element.click()
                 Thread.sleep(100)
-            } catch (e: NoSuchElementException) {
+            } catch (e: Exception) {
+                // Possibly last page?
                 break
             }
         }
 
         return chapters.size
+    }
+
+    fun writeFiles() {
+        assert(chapters.isNotEmpty())
+
+        logger.info("Will be writing ${chapters.size} chapters to $baseDir")
+
+        for (chapter in chapters) {
+            logger.info("Processing chapter ${chapter.title}")
+            val htmlFile = File("$baseDir/${chapter.title}.html")
+            Files.createParentDirs(htmlFile)
+
+            Files.write(chapter.text.toByteArray(), htmlFile)
+            logger.info("Wrote ${htmlFile.absolutePath}")
+
+            for (img in chapter.images) {
+                val imgFile = File("$baseDir/${img.key}")
+                Files.createParentDirs(imgFile)
+                ImageIO.write(img.value, "jpg", imgFile)
+
+                logger.info("Wrote ${imgFile.absolutePath}")
+            }
+        }
     }
 
     @VisibleForTesting
@@ -135,6 +166,9 @@ class StoryDownloader(props: Properties) {
         wait.until {
             checkPageIsLoaded()
         }
+
+        // Sometimes we need to wait for CSS selector to render
+        waitForCss(TITLE_CSS_SELECTOR)
 
         val title = driver.findElement(By.cssSelector(TITLE_CSS_SELECTOR)).getAttribute("innerText")
 
