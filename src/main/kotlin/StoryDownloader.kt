@@ -1,6 +1,9 @@
 import com.google.common.annotations.VisibleForTesting
 import com.google.common.io.Files
 import coza.opencollab.epub.creator.model.EpubBook
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.safety.Whitelist
 import org.openqa.selenium.By
 import org.openqa.selenium.Keys
 import org.openqa.selenium.WebElement
@@ -12,6 +15,8 @@ import org.openqa.selenium.support.ui.WebDriverWait
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URL
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.logging.Logger
 import javax.imageio.ImageIO
@@ -25,6 +30,8 @@ class StoryDownloader(props: Properties) {
     val LOGIN_BUTTON_XPATH = "/html/body/div[3]/div/div/div[2]/div/div/div/form/button"
 
     val TITLE_CSS_SELECTOR = "#text-container > h1"
+    val STORY_NAME_CSS_SELECTOR = "#app > aside > div.book-row.no-border > div.book-row-content > div.book-title"
+    val AUTHOR_NAME_CSS_SELECTOR = "#app > aside > div.book-row.no-border > div.book-row-content > div.book-author > a"
 
     val NEXT_CSS_SELECTOR = "#reader > div.reader-content.hidden-print > div > ul > li.next > a"
 
@@ -35,6 +42,9 @@ class StoryDownloader(props: Properties) {
     private val atLogin: String
     private val atPassword: String
     private val baseDir: String
+
+    private var storyName: String? = null
+    private var authorName: String? = null
 
     private val logger = Logger.getLogger("StoryDownloader")
 
@@ -81,6 +91,10 @@ class StoryDownloader(props: Properties) {
     fun downloadStory(startUrl: String): Int {
         assert(ensureLogin())
         driver.get(startUrl)
+
+        storyName = driver.findElementByCssSelector(STORY_NAME_CSS_SELECTOR).text
+        authorName = driver.findElementByCssSelector(AUTHOR_NAME_CSS_SELECTOR).text
+
         while (true) {
             chapters.add(getNextChapter())
             try {
@@ -126,13 +140,14 @@ class StoryDownloader(props: Properties) {
 
     fun writeEpub(fileName: String) {
         assert(chapters.isNotEmpty())
-        val book = EpubBook("ru", "some-id", "some-title", "some-author")
+        logger.info("Writing ebook by $authorName called $storyName")
+        val book = EpubBook("ru", authorName + "_" + storyName, storyName, authorName)
         for (chapter in chapters) {
             logger.info("Processing chapter ${chapter.title}")
 
             book.addContent(chapter.text.toByteArray(),
                 "application/xhtml+xml",
-                chapter.title + ".html", true, true)
+                chapter.title + ".html", true, true).id = chapter.title
 
             for (img in chapter.images) {
                 val bos = ByteArrayOutputStream()
@@ -212,6 +227,14 @@ class StoryDownloader(props: Properties) {
             chapter.text += "$outerHTML\n"
         }
 
+        val html = Jsoup.clean(chapter.text, Whitelist.basicWithImages())
+        val doc = Jsoup.parse(html)
+        doc.outputSettings()
+            .syntax(Document.OutputSettings.Syntax.xml)
+            .prettyPrint(true)
+            .charset(StandardCharsets.UTF_8)
+
+        chapter.text = doc.html()
         return chapter
     }
 

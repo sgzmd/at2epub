@@ -19,6 +19,7 @@ internal class Downloader : CliktCommand() {
         } else if (format == "epub") {
             downloader.writeEpub(outputFile)
         }
+        downloader.closeWebdriver()
     }
 }
 
