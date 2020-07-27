@@ -1,5 +1,6 @@
 import com.google.common.annotations.VisibleForTesting
 import com.google.common.io.Files
+import coza.opencollab.epub.creator.model.EpubBook
 import org.openqa.selenium.By
 import org.openqa.selenium.Keys
 import org.openqa.selenium.WebElement
@@ -8,8 +9,8 @@ import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.remote.RemoteWebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.lang.Exception
 import java.net.URL
 import java.util.*
 import java.util.logging.Logger
@@ -123,6 +124,26 @@ class StoryDownloader(props: Properties) {
         }
     }
 
+    fun writeEpub(fileName: String) {
+        assert(chapters.isNotEmpty())
+        val book = EpubBook("ru", "some-id", "some-title", "some-author")
+        for (chapter in chapters) {
+            logger.info("Processing chapter ${chapter.title}")
+
+            book.addContent(chapter.text.toByteArray(),
+                "application/xhtml+xml",
+                chapter.title + ".html", true, true)
+
+            for (img in chapter.images) {
+                val bos = ByteArrayOutputStream()
+                ImageIO.write(img.value, "jpg", bos)
+                book.addContent(bos.toByteArray(), "image/jpg", img.key, false, false)
+            }
+        }
+
+        book.writeToFile(fileName)
+    }
+
     @VisibleForTesting
     fun ensureLogin(): Boolean {
         driver.get(MAIN_URL)
@@ -160,7 +181,7 @@ class StoryDownloader(props: Properties) {
     }
 
     @VisibleForTesting
-    fun getNextChapter() : Chapter {
+    fun getNextChapter(): Chapter {
         logger.info("Url: ${driver.currentUrl}")
 
         wait.until {
