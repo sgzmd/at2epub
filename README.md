@@ -23,11 +23,12 @@ basedir=downloads
 Запускайте командой:
 
 ```
-$ java -jar target/at2epub-1.0-SNAPSHOT-jar-with-dependencies.jar --url="https://author.today/reader/60379"
+$ java -jar target/at2epub-1.0-SNAPSHOT-jar-with-dependencies.jar \
+    --url="https://author.today/reader/60379" \
+    --format=epub --output-file=result.epub
 ```
 
 Поскольку используется Selenium, процесс может быть нестабильным - иногда по
 каким-то причинам скачивание падает и его приходится перезапускать.
 
-После скачивания в директории `downloads` будут HTML файлы и картинки, их можно
-собрать в epub при помощи Sigil или Calibre. В планах автоматическая сборка epub. 
+После скачивания будет создан файл `result.epub` с получившейся книгой.
