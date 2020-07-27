@@ -24,8 +24,7 @@ basedir=downloads
 
 ```
 $ java -jar target/at2epub-1.0-SNAPSHOT-jar-with-dependencies.jar \
-    --url="https://author.today/reader/60379" \
-    --format=epub --output-file=result.epub
+    https://author.today/reader/60379 result.epub
 ```
 
 Поскольку используется Selenium, процесс может быть нестабильным - иногда по
