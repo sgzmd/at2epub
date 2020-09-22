@@ -1,3 +1,4 @@
+import org.openqa.selenium.WebElement
 import org.openqa.selenium.remote.RemoteWebDriver
 import org.openqa.selenium.support.ui.WebDriverWait
 import java.util.logging.Logger
@@ -16,5 +17,9 @@ object ChromeDriverUtils {
     wait.until {
       checkPageIsLoaded(it as RemoteWebDriver)
     }
+  }
+
+  fun scrollIntoView(driver: RemoteWebDriver, element: WebElement) {
+    driver.executeScript("arguments[0].scrollIntoView(true);", element)
   }
 }

@@ -1,5 +1,7 @@
 import ChromeDriverUtils.blockUntilLoaded
+import ChromeDriverUtils.scrollIntoView
 import org.openqa.selenium.By
+import org.openqa.selenium.Keys
 import org.openqa.selenium.NoSuchElementException
 import org.openqa.selenium.OutputType
 import org.openqa.selenium.chrome.ChromeDriver
@@ -7,15 +9,26 @@ import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.support.ui.WebDriverWait
 import java.io.FileInputStream
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.*
 import java.util.logging.Logger
 
-class Zelluloza(val storyUrl: String, val userName: String, val password: String, val chromedriverPath: String) {
+class Zelluloza(
+  val storyUrl: String,
+  val userName: String,
+  val password: String,
+  val chromedriverPath: String,
+  val basedir: String
+) {
 
   private val logger = Logger.getLogger("ChromeDriverUtils")
 
   private var driver: ChromeDriver
   private var wait: WebDriverWait
+  private var screenshotId = 1
+
+  private var autoAdjusted = false
 
   init {
     System.setProperty("webdriver.chrome.driver", chromedriverPath)
@@ -55,37 +68,89 @@ class Zelluloza(val storyUrl: String, val userName: String, val password: String
     }
   }
 
-  fun readFragment() {
-    val uri = URI(driver.currentUrl)
-    val settingsUri = URI(uri.scheme, uri.host, uri.path, "settings")
-    getAndWait(settingsUri.toString())
+  private fun writeScreenshot(screenshot: ByteArray) {
+    logger.info("Got a screenshot, ${screenshot.size} bytes.")
 
-    // Auto-adjust
-    driver.findElementByCssSelector("#readframe > div:nth-child(6) > div:nth-child(9) > div.bluebtn2.f24").click()
-    blockUntilLoaded(wait)
 
-    try {
-      driver.findElementByCssSelector("#cookie > div.rht.flex > div").click()
-      logger.info("Cookies accepted")
-    } catch (e: NoSuchElementException) {
+    val screenshotIdPostfix = screenshotId.toString().padStart(5, '0')
+    val basedirPath = Paths.get(basedir)
+    if (!Files.exists(basedirPath)) {
+      Files.createDirectory(basedirPath)
     }
 
-    val screenshot = driver.getScreenshotAs(OutputType.BYTES)
-    logger.info("Got a screenshot, ${screenshot.size} bytes.")
+    val fos = Files.newOutputStream(Paths.get(basedirPath.toString(), "screenshot_$screenshotIdPostfix.png"))
+    fos.use {
+      it.write(screenshot)
+    }
+
+    ++screenshotId
+  }
+
+  fun readFragment() {
+    val fragmentUrl = driver.currentUrl
+    // We only need to do auto-adjust once per session, after that website seems to remember it.
+    if (!autoAdjusted) {
+      val uri = URI(driver.currentUrl)
+      val settingsUri = URI(uri.scheme, uri.host, uri.path, "settings")
+
+      getAndWait(settingsUri.toString())
+      driver.findElementByCssSelector("#fh").clear()
+      driver.findElementByCssSelector("#fh").sendKeys("26")
+      val applyBtn =
+        driver.findElementByCssSelector("#readframe > div:nth-child(6) > div:nth-child(9) > div:nth-child(20) > div.bluebtn2.f16")
+      scrollIntoView(driver, applyBtn)
+
+      applyBtn.click()
+      blockUntilLoaded(wait)
+
+      getAndWait(settingsUri.toString())
+
+      // Auto-adjust
+      driver.findElementByCssSelector("#readframe > div:nth-child(6) > div:nth-child(9) > div.bluebtn2.f24").click()
+      blockUntilLoaded(wait)
+
+      autoAdjusted = true
+    }
+
+    getAndWait(fragmentUrl)
+
+    var previousScreenshot: ByteArray? = null
+    while (true) {
+      for (j in 0 until 10) {
+        try {
+          val activeCanvas = driver.findElementByCssSelector("canvas[style='display: inline;'")
+          scrollIntoView(driver, activeCanvas)
+          break
+        } catch (e: NoSuchElementException) {
+        }
+      }
+
+      val screenshot = driver.getScreenshotAs(OutputType.BYTES)
+
+      if (Arrays.equals(screenshot, previousScreenshot)) {
+        break
+      } else {
+        previousScreenshot = screenshot
+      }
+      writeScreenshot(screenshot)
+      driver.findElementByTagName("body").sendKeys(Keys.SPACE)
+      Thread.sleep(25)
+    }
   }
 
   fun getFragments() {
     val fragmentsUrl = storyUrl + "#fragments"
     getAndWait(fragmentsUrl)
     // How to list all fragments?
-    val inputs = driver.findElementsByCssSelector("ul.g0 > li > div > div > div > input.bluesmbtn")
+    val buttonsSelector = "input.bluesmbtn[type='button']"
+    val inputs = driver.findElementsByCssSelector(buttonsSelector)
 
-    for (i in 0..inputs.size - 1) {
+    for (i in 0 until inputs.size) {
       // Repeating it because all inputs will become stale upon page
       // reload and we'll have to refreshn it anyway.
       getAndWait(fragmentsUrl)
       // How to list all fragments?
-      val inputs = driver.findElementsByCssSelector("ul.g0 > li > div > div > div > input")
+      val inputs = driver.findElementsByCssSelector(buttonsSelector)
       val button = inputs[i]
 
       if (i > 0) {
@@ -109,6 +174,12 @@ class Zelluloza(val storyUrl: String, val userName: String, val password: String
       return false
     }
 
+    try {
+      driver.findElementByCssSelector("#cookie > div.rht.flex > div").click()
+      logger.info("Cookies accepted")
+    } catch (e: NoSuchElementException) {
+    }
+
     getFragments()
 
     return true
@@ -124,52 +195,14 @@ class Zelluloza(val storyUrl: String, val userName: String, val password: String
 
       val chromeDriverPath = props.getProperty("chromedriver")
 
-      val z = Zelluloza(url, props.getProperty("login"), props.getProperty("zpassword"), chromeDriverPath)
+      val z = Zelluloza(
+        url,
+        props.getProperty("login"),
+        props.getProperty("zpassword"),
+        chromeDriverPath,
+        props.getProperty("basedir")
+      )
       z.downloadStory()
-
-//      System.setProperty("webdriver.chrome.driver", chromeDriverPath)
-//      val options = ChromeOptions()
-//      options.addArguments("--disable-gpu", "--window-size=1920,1200", "--ignore-certificate-errors")
-//      lateinit var driver: ChromeDriver
-//      try {
-//        driver = ChromeDriver(options)
-//        driver.get(url)
-//        Thread.sleep(1000)
-//        var screenshotId = 1
-//        var previousScreenshot: ByteArray? = null
-//
-//        while (true) {
-//          val screenshot = driver.getScreenshotAs(OutputType.BYTES)
-//          if (Arrays.equals(screenshot, previousScreenshot)) {
-//
-//            try {
-//              // Next fragment
-//              driver.findElement(By.xpath("/html/body/div[3]/div[1]/div/div[1]/div[1]/div/div[3]/div[1]/div"))
-//                .click()
-//            } catch (e: Exception) {
-//              break
-//            }
-//          } else {
-//            previousScreenshot = screenshot
-//          }
-//          val bos = BufferedOutputStream(FileOutputStream("result_$screenshotId.png"))
-//          bos.write(screenshot)
-//          bos.close()
-//
-//          try {
-//            driver.findElement(By.xpath("//*[@id=\"cookie\"]/div[2]/div")).click()
-//          } catch (e: Exception) {
-//          }
-//
-////          driver.executeScript("window.scrollTo(0, document.body.scrollHeight)")
-//          driver.findElement(By.tagName("body")).sendKeys(Keys.PAGE_DOWN)
-//          Thread.sleep(10)
-//          screenshotId++
-//        }
-//      } finally {
-//        driver.close()
-//      }
-//    }
     }
   }
 }
