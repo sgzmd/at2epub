@@ -82,10 +82,7 @@ class StoryDownloader(props: Properties) {
     }
 
     private fun checkPageIsLoaded(): Boolean {
-        val res = driver.executeScript("return document.readyState")
-        val loaded = res.equals("complete")
-        logger.info("Checking page is loaded: $loaded")
-        return loaded
+        return ChromeDriverUtils.checkPageIsLoaded(driver)
     }
 
     fun downloadStory(startUrl: String): Int {
