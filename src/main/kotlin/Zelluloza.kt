@@ -8,6 +8,7 @@ import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.chrome.ChromeOptions
 import org.openqa.selenium.support.ui.WebDriverWait
 import java.io.FileInputStream
+import java.lang.Exception
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -29,6 +30,8 @@ class Zelluloza(
   private var screenshotId = 1
 
   private var autoAdjusted = false
+
+  private val ACTIVE_CANVAS_SELECTOR = "canvas[style='display: inline;']"
 
   init {
     System.setProperty("webdriver.chrome.driver", chromedriverPath)
@@ -68,8 +71,8 @@ class Zelluloza(
     }
   }
 
-  private fun writeScreenshot(screenshot: ByteArray) {
-    logger.info("Got a screenshot, ${screenshot.size} bytes.")
+  private fun writeScreenshot(screenshot: ByteArray?) {
+    logger.info("Got a screenshot, ${screenshot?.size} bytes.")
 
 
     val screenshotIdPostfix = screenshotId.toString().padStart(5, '0')
@@ -85,6 +88,25 @@ class Zelluloza(
 
     ++screenshotId
   }
+  fun getScreenshot(): ByteArray? {
+    wait.until { driver.findElementsByCssSelector(ACTIVE_CANVAS_SELECTOR).size > 0 }
+
+    val dataUrl = driver.executeScript("return document.querySelector(\"$ACTIVE_CANVAS_SELECTOR\").toDataURL('image/png')")
+    // URL will look like this: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA .... "
+
+    val dataUrlString = dataUrl.toString()
+    return Base64.getDecoder().decode(dataUrlString.split(',')[1])
+  }
+
+  fun scrollBackToStartOfFragment() {
+    logger.info("Scrolling back just in case, hang on... ")
+    for (i in 0 until 50) {
+      driver.executeScript("return bpage(0,1);")
+      Thread.sleep(30)
+    }
+
+    Thread.sleep(1000)
+  }
 
   fun readFragment() {
     val fragmentUrl = driver.currentUrl
@@ -95,7 +117,22 @@ class Zelluloza(
 
       getAndWait(settingsUri.toString())
       driver.findElementByCssSelector("#fh").clear()
-      driver.findElementByCssSelector("#fh").sendKeys("26")
+      driver.findElementByCssSelector("#fh").sendKeys("25")
+      val width = driver.findElementByCssSelector("#zoxval")
+      width.clear()
+      width.sendKeys("2100")
+      val height = driver.findElementByCssSelector("#zoyval")
+      height.clear()
+      height.sendKeys("2970")
+
+      val bgColour = driver.findElementByCssSelector("#bgcolor")
+      bgColour.clear()
+      bgColour.sendKeys("#FFFFFF")
+
+      val fgColour = driver.findElementByCssSelector("#fgcolor")
+      fgColour.clear()
+      fgColour.sendKeys("#000000")
+
       val applyBtn =
         driver.findElementByCssSelector("#readframe > div:nth-child(6) > div:nth-child(9) > div:nth-child(20) > div.bluebtn2.f16")
       scrollIntoView(driver, applyBtn)
@@ -103,38 +140,41 @@ class Zelluloza(
       applyBtn.click()
       blockUntilLoaded(wait)
 
-      getAndWait(settingsUri.toString())
-
-      // Auto-adjust
-      driver.findElementByCssSelector("#readframe > div:nth-child(6) > div:nth-child(9) > div.bluebtn2.f24").click()
-      blockUntilLoaded(wait)
-
       autoAdjusted = true
     }
 
     getAndWait(fragmentUrl)
 
+    logger.info("Waiting for 2s for page to settle...")
+    Thread.sleep(2000)
+
+    scrollBackToStartOfFragment()
+
     var previousScreenshot: ByteArray? = null
     while (true) {
       for (j in 0 until 10) {
         try {
-          val activeCanvas = driver.findElementByCssSelector("canvas[style='display: inline;'")
+          val activeCanvas = driver.findElementByCssSelector("canvas[style='display: inline;']")
           scrollIntoView(driver, activeCanvas)
           break
         } catch (e: NoSuchElementException) {
         }
       }
 
-      val screenshot = driver.getScreenshotAs(OutputType.BYTES)
+      val screenshot = getScreenshot() //driver.getScreenshotAs(OutputType.BYTES)
 
       if (Arrays.equals(screenshot, previousScreenshot)) {
+        logger.info("Equal screenshots (screenshot.size=${screenshot?.size}, previousScreenshot.size=${previousScreenshot?.size})")
         break
       } else {
         previousScreenshot = screenshot
       }
       writeScreenshot(screenshot)
-      driver.findElementByTagName("body").sendKeys(Keys.SPACE)
-      Thread.sleep(25)
+
+      // Moves to the next page
+      val bpage = driver.executeScript("return bpage(1,1);")
+      logger.info("Moved to the next page, bpage(1,1) = $bpage")
+      Thread.sleep(500)
     }
   }
 
