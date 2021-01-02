@@ -9,6 +9,9 @@ import org.openqa.selenium.Keys
 import org.openqa.selenium.WebElement
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.chrome.ChromeOptions
+import org.openqa.selenium.firefox.FirefoxBinary
+import org.openqa.selenium.firefox.FirefoxDriver
+import org.openqa.selenium.firefox.FirefoxOptions
 import org.openqa.selenium.remote.RemoteWebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
@@ -54,13 +57,21 @@ class StoryDownloader(props: Properties) {
     init {
         logger.info("Initializing StoryDownloader...")
         val chromeDriverPath = props.getProperty("chromedriver")
+        val profileDir = props.getProperty("profile_dir")
 
         System.setProperty("webdriver.chrome.driver", chromeDriverPath)
         val options = ChromeOptions()
-        options.addArguments("--disable-gpu", "--window-size=1920,1200", "--ignore-certificate-errors")
+
+        options.addArguments(
+            "--disable-gpu",
+            "--window-size=1920,1200",
+            "--ignore-certificate-errors",
+            "--disable-blink-features=AutomationControlled",
+            "--user-data-dir=$profileDir")
+        options.setExperimentalOption("excludeSwitches", arrayOf("enable-automation"))
         driver = ChromeDriver(options)
 
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 100)
 
         atLogin = props.getProperty("login")
         atPassword = props.getProperty("password")
